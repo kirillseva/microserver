@@ -14,7 +14,7 @@ http_server <- function(routes) {
     query  <- extract_query_from_request(req)
     route  <- determine_route(routes, req$PATH_INFO)
     if (is.microserver_response(route)) return(unclass(route))
-    environment(route) <- list2env(list(.server_env = environment()), parent = environment(route))
+    environment(route) <- list2env(list(server_env = function() .microserver_env), parent = environment(route))
     result <- route(params, query)
     if (is.microserver_response(result)) unclass(result)
     else unclass(microserver_response(result))
@@ -29,7 +29,14 @@ http_server <- function(routes) {
 #' @param port integer. The default is 8103.
 #' @importFrom httpuv startServer stopServer service
 #' @export
-run_server <- function(routes, port = 8103) {
+run_server <- function(routes, port = 8103, decorators = NULL) {
+  if (!is.null(decorators)) {
+    stopifnot(is.list(decorators))
+    stopifnot(all(sapply(decorators, is.function)))
+    .microserver_env[['__decorators']] <- decorators
+    on.exit(.microserver_env[['__decorators']] <- NULL, add = TRUE)
+  }
+
   # A list of default HTTUPV callbacks
   httpuv_callbacks <- list(
     onHeaders = function(req) { NULL },
@@ -44,6 +51,10 @@ run_server <- function(routes, port = 8103) {
 
   repeat {
     httpuv::service(1)
+    if (!is.null(.microserver_env[['__decorators']])) {
+      lapply(.microserver_env[['__decorators']], function(decorator) decorator(.microserver_env))
+    }
+    clean_envir(.microserver_env, exceptions = c('__decorators'))
     Sys.sleep(0.001)
   }
 }

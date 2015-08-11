@@ -1,5 +1,7 @@
 `%||%` <- function(x, y) if (is.null(x)) y else x
 
+.microserver_env <- new.env()
+
 from_json <- function(obj) {
   simplify_homogeneous_lists(jsonlite::fromJSON(obj, simplifyVector = FALSE))
 }
@@ -26,6 +28,13 @@ to_json <- function(obj) {
   as.character(jsonlite::toJSON(obj2, auto_unbox = TRUE))
 }
 
+clean_envir <- function(env, exceptions = NULL) {
+  lapply(ls(env), function(item) {
+    if (!item %in% exceptions) env[[item]] <- NULL
+  })
+  invisible(TRUE)
+}
+
 #' Fix jsonlite's JSON simplification.
 #'
 #' @param object any R object derived from \code{\link[jsonlite]{fromJSON}}.
@@ -36,7 +45,7 @@ to_json <- function(obj) {
 #' \dontrun{
 #'   simplify_homogeneous_lists(jsonlite::fromJSON(
 #'    '{ "numeric": [1,2], "list": [1, "a"] }', simplifyVector = FALSE))
-#'   # A list with atomic numeric vector in the "numeric" key and 
+#'   # A list with atomic numeric vector in the "numeric" key and
 #'   # a list in the "list" key.
 #'   # list(numeric = c(1,2), list = list(1, "a"))
 #' }
@@ -46,7 +55,7 @@ simplify_homogeneous_lists <- function(object) {
       type <- common_type(object)
       if (identical(type, "NULL")) { object }
       else if (is.na(type)) { object }
-      else { 
+      else {
         vapply(object, identity, vector(type, 1))
       }
     } else {
